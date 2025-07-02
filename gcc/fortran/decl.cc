@@ -11879,6 +11879,7 @@ const ext_attr_t ext_attr_list[] = {
   { "noinline",     EXT_ATTR_NOINLINE,     NULL	       },
   { "noreturn",     EXT_ATTR_NORETURN,     NULL	       },
   { "weak",	    EXT_ATTR_WEAK,	   NULL	       },
+  { "target_clones", EXT_ATTR_TARGET_CLONES, NULL       },
   { NULL,           EXT_ATTR_LAST,         NULL        }
 };
 
@@ -11926,6 +11927,79 @@ gfc_match_gcc_attributes (void)
       if (!gfc_add_ext_attribute (&attr, (ext_attr_id_t)id, &gfc_current_locus))
 	return MATCH_ERROR;
 
+      /* Handle target_clones attribute with arguments */
+      if (id == EXT_ATTR_TARGET_CLONES)
+	{
+	  char target_arg[GFC_MAX_SYMBOL_LEN + 1];
+	  int arg_count = 0;
+	  char **target_args = NULL;
+	  
+	  /* Expect opening parenthesis for target_clones */
+	  if (gfc_match_char ('(') != MATCH_YES)
+	    {
+	      gfc_error ("Expected '(' after TARGET_CLONES attribute at %C");
+	      return MATCH_ERROR;
+	    }
+	  
+	  /* Parse comma-separated list of target specifications */
+	  for (;;)
+	    {
+	      /* Match quoted string argument */
+	      if (gfc_match (" '%n' ", target_arg) == MATCH_YES)
+		{
+		  arg_count++;
+		  target_args = (char **) xrealloc (target_args, 
+						     arg_count * sizeof (char *));
+		  target_args[arg_count - 1] = xstrdup (target_arg);
+		  
+		  /* Check for comma (more arguments) or closing parenthesis */
+		  if (gfc_match_char (',') == MATCH_YES)
+		    continue;
+		  else if (gfc_match_char (')') == MATCH_YES)
+		    break;
+		  else
+		    {
+		      gfc_error ("Expected ',' or ')' in TARGET_CLONES argument list at %C");
+		      goto target_clones_error;
+		    }
+		}
+	      else
+		{
+		  gfc_error ("Expected quoted string argument in TARGET_CLONES at %C");
+		  goto target_clones_error;
+		}
+	    }
+	  
+	  /* Store the parsed arguments for later use when processing symbols */
+	  /* We'll store them temporarily and apply to symbols later */
+	  /* For now, just store in a static variable or similar mechanism */
+	  static char **pending_target_clones_args = NULL;
+	  static int pending_target_clones_count = 0;
+	  
+	  /* Free previous pending args if any */
+	  if (pending_target_clones_args)
+	    {
+	      for (int i = 0; i < pending_target_clones_count; i++)
+		free (pending_target_clones_args[i]);
+	      free (pending_target_clones_args);
+	    }
+	  
+	  pending_target_clones_args = target_args;
+	  pending_target_clones_count = arg_count;
+	  
+	  goto attribute_parsed;
+
+target_clones_error:
+	  if (target_args)
+	    {
+	      for (int i = 0; i < arg_count; i++)
+		free (target_args[i]);
+	      free (target_args);
+	    }
+	  return MATCH_ERROR;
+	}
+
+attribute_parsed:
       gfc_gobble_whitespace ();
       ch = gfc_next_ascii_char ();
       if (ch == ':')
@@ -11954,6 +12028,31 @@ gfc_match_gcc_attributes (void)
 	return MATCH_ERROR;
 
       sym->attr.ext_attr |= attr.ext_attr;
+
+      /* Apply target_clones arguments if this attribute was specified */
+      if (attr.ext_attr & (1 << EXT_ATTR_TARGET_CLONES))
+	{
+	  static char **pending_target_clones_args = NULL;
+	  static int pending_target_clones_count = 0;
+	  
+	  if (pending_target_clones_args && pending_target_clones_count > 0)
+	    {
+	      sym->target_clones_args = (char **) xmalloc (pending_target_clones_count * sizeof (char *));
+	      sym->target_clones_count = pending_target_clones_count;
+	      
+	      for (int i = 0; i < pending_target_clones_count; i++)
+		sym->target_clones_args[i] = xstrdup (pending_target_clones_args[i]);
+	      
+	      /* Debug output to verify parsing */
+	      if (flag_max_errors == 0 || warningcount + errorcount < flag_max_errors)
+		{
+		  fprintf (stderr, "TARGET_CLONES attribute applied to symbol '%s' with %d arguments:\n", 
+			   sym->name, sym->target_clones_count);
+		  for (int i = 0; i < sym->target_clones_count; i++)
+		    fprintf (stderr, "  [%d]: '%s'\n", i, sym->target_clones_args[i]);
+		}
+	    }
+	}
 
       if (gfc_match_eos () == MATCH_YES)
 	break;
