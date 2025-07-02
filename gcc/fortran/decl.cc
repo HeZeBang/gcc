@@ -11930,7 +11930,6 @@ gfc_match_gcc_attributes (void)
       /* Handle target_clones attribute with arguments */
       if (id == EXT_ATTR_TARGET_CLONES)
 	{
-	  char target_arg[GFC_MAX_SYMBOL_LEN + 1];
 	  int arg_count = 0;
 	  char **target_args = NULL;
 	  
@@ -11944,22 +11943,47 @@ gfc_match_gcc_attributes (void)
 	  /* Parse comma-separated list of target specifications */
 	  for (;;)
 	    {
+	      gfc_expr *expr = NULL;
+	      
 	      /* Match quoted string argument */
-	      if (gfc_match (" '%n' ", target_arg) == MATCH_YES)
+	      if (gfc_match_literal_constant (&expr, 0) == MATCH_YES)
 		{
-		  arg_count++;
-		  target_args = (char **) xrealloc (target_args, 
-						     arg_count * sizeof (char *));
-		  target_args[arg_count - 1] = xstrdup (target_arg);
-		  
-		  /* Check for comma (more arguments) or closing parenthesis */
-		  if (gfc_match_char (',') == MATCH_YES)
-		    continue;
-		  else if (gfc_match_char (')') == MATCH_YES)
-		    break;
+		  /* Verify it's a character constant */
+		  if (expr->expr_type == EXPR_CONSTANT && expr->ts.type == BT_CHARACTER)
+		    {
+		      arg_count++;
+		      target_args = (char **) xrealloc (target_args, 
+						         arg_count * sizeof (char *));
+		      
+		      /* Convert gfc_char_t* to char* */
+		      int len = expr->value.character.length;
+		      char *arg_str = (char *) xmalloc (len + 1);
+		      for (int i = 0; i < len; i++)
+			arg_str[i] = (char) expr->value.character.string[i];
+		      arg_str[len] = '\0';
+		      
+		      target_args[arg_count - 1] = arg_str;
+		      gfc_free_expr (expr);
+		      
+		      /* Check for comma (more arguments) or closing parenthesis */
+		      gfc_gobble_whitespace ();
+		      if (gfc_match_char (',') == MATCH_YES)
+			{
+			  gfc_gobble_whitespace ();
+			  continue;
+			}
+		      else if (gfc_match_char (')') == MATCH_YES)
+			break;
+		      else
+			{
+			  gfc_error ("Expected ',' or ')' in TARGET_CLONES argument list at %C");
+			  goto target_clones_error;
+			}
+		    }
 		  else
 		    {
-		      gfc_error ("Expected ',' or ')' in TARGET_CLONES argument list at %C");
+		      gfc_free_expr (expr);
+		      gfc_error ("TARGET_CLONES arguments must be character constants at %C");
 		      goto target_clones_error;
 		    }
 		}
@@ -11971,8 +11995,6 @@ gfc_match_gcc_attributes (void)
 	    }
 	  
 	  /* Store the parsed arguments for later use when processing symbols */
-	  /* We'll store them temporarily and apply to symbols later */
-	  /* For now, just store in a static variable or similar mechanism */
 	  static char **pending_target_clones_args = NULL;
 	  static int pending_target_clones_count = 0;
 	  
