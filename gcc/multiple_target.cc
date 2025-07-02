@@ -314,6 +314,15 @@ static bool
 expand_target_clones (struct cgraph_node *node, bool definition)
 {
   int i;
+  
+  /* DEBUG INJECTION: Print when expanding target clones */
+  if (DECL_NAME (node->decl))
+    {
+      fprintf (stderr, "[HACK] Expanding target_clones for function: %s\n",
+               IDENTIFIER_POINTER (DECL_NAME (node->decl)));
+      fprintf (stderr, "[HACK] Definition: %s\n", definition ? "yes" : "no");
+    }
+  
   /* Parsing target attributes separated by TARGET_CLONES_ATTR_SEPARATOR.  */
   tree attr_target = lookup_attribute ("target_clones",
 				       DECL_ATTRIBUTES (node->decl));
@@ -404,6 +413,11 @@ expand_target_clones (struct cgraph_node *node, bool definition)
 
       char *suffix = XNEWVEC (char, strlen (attr) + 1);
       create_new_asm_name (attr, suffix);
+      
+      /* DEBUG INJECTION: Print clone creation details */
+      fprintf (stderr, "[HACK] Creating clone with target: %s\n", attr);
+      fprintf (stderr, "[HACK] Clone suffix: %s\n", suffix);
+      
       cgraph_node *new_node = create_target_clone (node, definition, suffix,
 						   attributes);
       XDELETEVEC (suffix);

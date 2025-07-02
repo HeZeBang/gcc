@@ -6118,6 +6118,15 @@ static tree
 handle_target_clones_attribute (tree *node, tree name, tree ARG_UNUSED (args),
 			  int ARG_UNUSED (flags), bool *no_add_attrs)
 {
+  /* DEBUG INJECTION: Print when target_clones attribute is being processed */
+  if (TREE_CODE (*node) == FUNCTION_DECL && DECL_NAME (*node))
+    {
+      fprintf (stderr, "[HACK] Processing target_clones attribute for function: %s\n",
+               IDENTIFIER_POINTER (DECL_NAME (*node)));
+      fprintf (stderr, "[HACK] Function location: %s:%d\n",
+               DECL_SOURCE_FILE (*node), DECL_SOURCE_LINE (*node));
+    }
+
   /* Ensure we have a function declaration.  */
   if (TREE_CODE (*node) == FUNCTION_DECL)
     {
@@ -6130,6 +6139,10 @@ handle_target_clones_attribute (tree *node, tree name, tree ARG_UNUSED (args),
 	      *no_add_attrs = true;
 	      return NULL_TREE;
 	    }
+	  
+	  /* DEBUG INJECTION: Print each target clone argument */
+	  fprintf (stderr, "[HACK] Target clone argument: %s\n",
+	           TREE_STRING_POINTER (value));
 	}
 
       if (get_target_clone_attr_len (args) == -1)
