@@ -11897,6 +11897,13 @@ const ext_attr_t ext_attr_list[] = {
 
    As there is absolutely no risk of confusion, we should never return
    MATCH_NO.  */
+
+/* Structure to temporarily hold target_clones arguments during parsing */
+typedef struct {
+  char **args;
+  int count;
+} target_clones_args_t;
+
 match
 gfc_match_gcc_attributes (void)
 {
@@ -11905,6 +11912,7 @@ gfc_match_gcc_attributes (void)
   unsigned id;
   gfc_symbol *sym;
   match m;
+  target_clones_args_t target_clones_data = { NULL, 0 };
 
   gfc_clear_attr (&attr);
   for(;;)
@@ -11930,9 +11938,6 @@ gfc_match_gcc_attributes (void)
       /* Handle target_clones attribute with arguments */
       if (id == EXT_ATTR_TARGET_CLONES)
 	{
-	  int arg_count = 0;
-	  char **target_args = NULL;
-	  
 	  /* Expect opening parenthesis for target_clones */
 	  if (gfc_match_char ('(') != MATCH_YES)
 	    {
@@ -11951,9 +11956,9 @@ gfc_match_gcc_attributes (void)
 		  /* Verify it's a character constant */
 		  if (expr->expr_type == EXPR_CONSTANT && expr->ts.type == BT_CHARACTER)
 		    {
-		      arg_count++;
-		      target_args = (char **) xrealloc (target_args, 
-						         arg_count * sizeof (char *));
+		      target_clones_data.count++;
+		      target_clones_data.args = (char **) xrealloc (target_clones_data.args, 
+						         target_clones_data.count * sizeof (char *));
 		      
 		      /* Convert gfc_char_t* to char* */
 		      int len = expr->value.character.length;
@@ -11962,7 +11967,7 @@ gfc_match_gcc_attributes (void)
 			arg_str[i] = (char) expr->value.character.string[i];
 		      arg_str[len] = '\0';
 		      
-		      target_args[arg_count - 1] = arg_str;
+		      target_clones_data.args[target_clones_data.count - 1] = arg_str;
 		      gfc_free_expr (expr);
 		      
 		      /* Check for comma (more arguments) or closing parenthesis */
@@ -11994,29 +11999,16 @@ gfc_match_gcc_attributes (void)
 		}
 	    }
 	  
-	  /* Store the parsed arguments for later use when processing symbols */
-	  static char **pending_target_clones_args = NULL;
-	  static int pending_target_clones_count = 0;
-	  
-	  /* Free previous pending args if any */
-	  if (pending_target_clones_args)
-	    {
-	      for (int i = 0; i < pending_target_clones_count; i++)
-		free (pending_target_clones_args[i]);
-	      free (pending_target_clones_args);
-	    }
-	  
-	  pending_target_clones_args = target_args;
-	  pending_target_clones_count = arg_count;
-	  
 	  goto attribute_parsed;
 
 target_clones_error:
-	  if (target_args)
+	  if (target_clones_data.args)
 	    {
-	      for (int i = 0; i < arg_count; i++)
-		free (target_args[i]);
-	      free (target_args);
+	      for (int i = 0; i < target_clones_data.count; i++)
+		free (target_clones_data.args[i]);
+	      free (target_clones_data.args);
+	      target_clones_data.args = NULL;
+	      target_clones_data.count = 0;
 	    }
 	  return MATCH_ERROR;
 	}
@@ -12054,25 +12046,13 @@ attribute_parsed:
       /* Apply target_clones arguments if this attribute was specified */
       if (attr.ext_attr & (1 << EXT_ATTR_TARGET_CLONES))
 	{
-	  static char **pending_target_clones_args = NULL;
-	  static int pending_target_clones_count = 0;
-	  
-	  if (pending_target_clones_args && pending_target_clones_count > 0)
+	  if (target_clones_data.args && target_clones_data.count > 0)
 	    {
-	      sym->target_clones_args = (char **) xmalloc (pending_target_clones_count * sizeof (char *));
-	      sym->target_clones_count = pending_target_clones_count;
+	      sym->target_clones_args = (char **) xmalloc (target_clones_data.count * sizeof (char *));
+	      sym->target_clones_count = target_clones_data.count;
 	      
-	      for (int i = 0; i < pending_target_clones_count; i++)
-		sym->target_clones_args[i] = xstrdup (pending_target_clones_args[i]);
-	      
-	      /* Debug output to verify parsing */
-	      if (flag_max_errors == 0 || warningcount + errorcount < flag_max_errors)
-		{
-		  fprintf (stderr, "TARGET_CLONES attribute applied to symbol '%s' with %d arguments:\n", 
-			   sym->name, sym->target_clones_count);
-		  for (int i = 0; i < sym->target_clones_count; i++)
-		    fprintf (stderr, "  [%d]: '%s'\n", i, sym->target_clones_args[i]);
-		}
+	      for (int i = 0; i < target_clones_data.count; i++)
+		sym->target_clones_args[i] = xstrdup (target_clones_data.args[i]);
 	    }
 	}
 
@@ -12083,9 +12063,24 @@ attribute_parsed:
 	goto syntax;
     }
 
+  /* Clean up target_clones temporary data */
+  if (target_clones_data.args)
+    {
+      for (int i = 0; i < target_clones_data.count; i++)
+	free (target_clones_data.args[i]);
+      free (target_clones_data.args);
+    }
+
   return MATCH_YES;
 
 syntax:
+  /* Clean up target_clones temporary data on error */
+  if (target_clones_data.args)
+    {
+      for (int i = 0; i < target_clones_data.count; i++)
+	free (target_clones_data.args[i]);
+      free (target_clones_data.args);
+    }
   gfc_error ("Syntax error in !GCC$ ATTRIBUTES statement at %C");
   return MATCH_ERROR;
 }
