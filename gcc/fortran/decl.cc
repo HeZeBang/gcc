@@ -11879,7 +11879,7 @@ const ext_attr_t ext_attr_list[] = {
   { "noinline",     EXT_ATTR_NOINLINE,     NULL	       },
   { "noreturn",     EXT_ATTR_NORETURN,     NULL	       },
   { "weak",	    EXT_ATTR_WEAK,	   NULL	       },
-  { "target_clones", EXT_ATTR_TARGET_CLONES, NULL       },
+  { "target_clones", EXT_ATTR_TARGET_CLONES, "target_clones" },
   { NULL,           EXT_ATTR_LAST,         NULL        }
 };
 

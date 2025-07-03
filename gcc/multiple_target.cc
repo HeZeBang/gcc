@@ -166,8 +166,18 @@ create_dispatcher_calls (struct cgraph_node *node)
 	}
     }
 
-  tree fname = clone_function_name (node->decl, "default");
-  symtab->change_decl_assembler_name (node->decl, fname);
+  /* DEBUG INJECTION: Print dispatcher call creation details */
+  if (DECL_NAME (node->decl))
+    {
+      fprintf (stderr, "[HACK] create_dispatcher_calls for function: %s\n",
+	       IDENTIFIER_POINTER (DECL_NAME (node->decl)));
+      if (DECL_ASSEMBLER_NAME_SET_P (node->decl))
+	fprintf (stderr, "[HACK] Current assembler name: %s\n",
+		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl)));
+    }
+
+  /* Note: Original function is already renamed to .default in expand_target_clones */
+  /* No need to rename again - just proceed with dispatcher creation */
 
   if (node->definition)
     {
@@ -326,12 +336,21 @@ expand_target_clones (struct cgraph_node *node, bool definition)
   /* Parsing target attributes separated by TARGET_CLONES_ATTR_SEPARATOR.  */
   tree attr_target = lookup_attribute ("target_clones",
 				       DECL_ATTRIBUTES (node->decl));
+  /* DEBUG INJECTION: Check attribute lookup result */
+  fprintf (stderr, "[HACK] Attribute lookup result: %s\n", attr_target ? "found" : "not found");
+  
   /* No targets specified.  */
   if (!attr_target)
-    return false;
+    {
+      fprintf (stderr, "[HACK] No target_clones attribute found, returning false\n");
+      return false;
+    }
 
   tree arglist = TREE_VALUE (attr_target);
+  fprintf (stderr, "[HACK] Arglist: %s\n", arglist ? "exists" : "null");
+  
   int attr_len = get_target_clone_attr_len (arglist);
+  fprintf (stderr, "[HACK] Attribute length: %d\n", attr_len);
 
   /* No need to clone for 1 target attribute.  */
   if (attr_len == -1)
@@ -420,6 +439,17 @@ expand_target_clones (struct cgraph_node *node, bool definition)
       
       cgraph_node *new_node = create_target_clone (node, definition, suffix,
 						   attributes);
+      
+      /* DEBUG INJECTION: Print created node details */
+      if (new_node && DECL_NAME (new_node->decl))
+	{
+	  fprintf (stderr, "[HACK] Created clone function name: %s\n", 
+		   IDENTIFIER_POINTER (DECL_NAME (new_node->decl)));
+	  if (DECL_ASSEMBLER_NAME_SET_P (new_node->decl))
+	    fprintf (stderr, "[HACK] Created clone assembler name: %s\n",
+		     IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (new_node->decl)));
+	}
+      
       XDELETEVEC (suffix);
       if (new_node == NULL)
 	{
@@ -455,6 +485,21 @@ expand_target_clones (struct cgraph_node *node, bool definition)
 				    DECL_ATTRIBUTES (node->decl));
   DECL_ATTRIBUTES (node->decl) = attributes;
   node->local = false;
+  
+  /* Immediately rename original function to .default to avoid conflicts */
+  tree default_fname = clone_function_name (node->decl, "default");
+  symtab->change_decl_assembler_name (node->decl, default_fname);
+  
+  /* DEBUG INJECTION: Print original function modification */
+  if (DECL_NAME (node->decl))
+    {
+      fprintf (stderr, "[HACK] Modified original function: %s to be 'default' target\n",
+	       IDENTIFIER_POINTER (DECL_NAME (node->decl)));
+      if (DECL_ASSEMBLER_NAME_SET_P (node->decl))
+	fprintf (stderr, "[HACK] Original function assembler name changed to: %s\n",
+		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl)));
+    }
+  
   return true;
 }
 
