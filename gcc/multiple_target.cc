@@ -176,8 +176,8 @@ create_dispatcher_calls (struct cgraph_node *node)
 		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl)));
     }
 
-  /* Note: Original function is already renamed to .default in expand_target_clones */
-  /* No need to rename again - just proceed with dispatcher creation */
+  tree default_fname = clone_function_name (node->decl, "default");
+  symtab->change_decl_assembler_name (node->decl, default_fname);
 
   if (node->definition)
     {
@@ -422,6 +422,15 @@ expand_target_clones (struct cgraph_node *node, bool definition)
   before = decl1_v;
   DECL_FUNCTION_VERSIONED (node->decl) = 1;
 
+  /* 为原始函数添加 target="default" 属性，确保调度器能够识别默认版本 */
+  const char *default_attr_name = (TARGET_HAS_FMV_TARGET_ATTRIBUTE
+				    ? "target" : "target_version");
+  tree default_attr = make_attribute (default_attr_name, "default", 
+				      DECL_ATTRIBUTES (node->decl));
+  DECL_ATTRIBUTES (node->decl) = default_attr;
+  
+  fprintf (stderr, "[HACK] Added default %s attribute to original function\n", default_attr_name);
+
   for (i = 0; i < attrnum; i++)
     {
       char *attr = attrs[i];
@@ -479,26 +488,6 @@ expand_target_clones (struct cgraph_node *node, bool definition)
 
   XDELETEVEC (attrs);
   XDELETEVEC (attr_str);
-
-  /* Setting new attribute to initial function.  */
-  tree attributes = make_attribute (new_attr_name, "default",
-				    DECL_ATTRIBUTES (node->decl));
-  DECL_ATTRIBUTES (node->decl) = attributes;
-  node->local = false;
-  
-  /* Immediately rename original function to .default to avoid conflicts */
-  tree default_fname = clone_function_name (node->decl, "default");
-  symtab->change_decl_assembler_name (node->decl, default_fname);
-  
-  /* DEBUG INJECTION: Print original function modification */
-  if (DECL_NAME (node->decl))
-    {
-      fprintf (stderr, "[HACK] Modified original function: %s to be 'default' target\n",
-	       IDENTIFIER_POINTER (DECL_NAME (node->decl)));
-      if (DECL_ASSEMBLER_NAME_SET_P (node->decl))
-	fprintf (stderr, "[HACK] Original function assembler name changed to: %s\n",
-		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl)));
-    }
   
   return true;
 }
