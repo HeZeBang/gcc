@@ -3064,14 +3064,11 @@ trans_function_start (gfc_symbol * sym)
   /* Let the world know what we're about to do.  */
   announce_function (fndecl);
 
-  if (DECL_FILE_SCOPE_P (fndecl))
-    {
-      /* Create RTL for function declaration.  */
-      rest_of_decl_compilation (fndecl, 1, 0);
-    }
-
-  /* Create RTL for function definition.  */
-  make_decl_rtl (fndecl);
+  /* Don't generate RTL here. Unlike the original approach that called
+     make_decl_rtl immediately, we delay RTL generation until after IPA passes
+     (like target_clones) have had a chance to modify function attributes such
+     as DECL_ASSEMBLER_NAME. This matches the C frontend approach where RTL
+     generation is deferred until cgraph_node::finalize_function. */
 
   allocate_struct_function (fndecl, false);
 
@@ -8229,6 +8226,16 @@ gfc_generate_function_code (gfc_namespace * ns)
       saved_function_decls = saved_parent_function_decls;
     }
   current_function_decl = old_context;
+
+  /* Now that the function is complete and IPA passes have had a chance to
+     run, we can safely generate RTL. This ensures that function attributes
+     modified by IPA passes (like target_clones changing DECL_ASSEMBLER_NAME)
+     are properly reflected in the generated RTL. */
+  if (DECL_FILE_SCOPE_P (fndecl))
+    {
+      /* Create RTL for function declaration if it's file scope.  */
+      rest_of_decl_compilation (fndecl, 1, 0);
+    }
 
   if (decl_function_context (fndecl))
     {
