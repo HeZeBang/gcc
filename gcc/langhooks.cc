@@ -165,6 +165,11 @@ lhd_set_decl_assembler_name (tree decl)
      is less than the whole compilation.  Concatenate a distinguishing
      number.  */
 
+  /* DEBUG INJECTION */
+  fprintf(stderr, "[HACK]: %s: TREE_PUBLIC: %d, DECL_FILE_SCOPE_P: %d\n",
+          IDENTIFIER_POINTER (DECL_NAME (decl)),
+          TREE_PUBLIC (decl), DECL_FILE_SCOPE_P (decl)
+        );
   if (TREE_PUBLIC (decl) || DECL_FILE_SCOPE_P (decl))
     id = targetm.mangle_decl_assembler_name (decl, DECL_NAME (decl));
   else

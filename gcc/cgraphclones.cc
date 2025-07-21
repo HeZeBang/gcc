@@ -497,6 +497,9 @@ clone_function_name_numbered (const char *name, const char *suffix)
     clone_fn_ids = hash_map<const char *, unsigned int>::create_ggc (64);
   unsigned int &suffix_counter = clone_fn_ids->get_or_insert (
 				   IDENTIFIER_POINTER (get_identifier (name)));
+  /* DEBUG INJECTION - Track counter assignment */
+  fprintf(stderr, "[HACK]: clone_function_name_numbered: name='%s', suffix='%s', counter=%u\n", 
+    name, suffix, suffix_counter);
   return clone_function_name (name, suffix, suffix_counter++);
 }
 
@@ -531,6 +534,9 @@ clone_function_name (const char *name, const char *suffix,
   strcpy (prefix + len + 1, suffix);
   prefix[len] = symbol_table::symbol_suffix_separator ();
   ASM_FORMAT_PRIVATE_NAME (tmp_name, prefix, number);
+  /* DEBUG INJECTION - Track name generation */
+  fprintf(stderr, "[HACK]: clone_function_name: name='%s', suffix='%s', number=%lu, result='%s'\n", 
+    name, suffix, number, tmp_name);
   return get_identifier (tmp_name);
 }
 
@@ -554,6 +560,9 @@ tree
 clone_function_name (tree decl, const char *suffix)
 {
   tree identifier = DECL_ASSEMBLER_NAME (decl);
+  /* DEBUG INJECTION */
+  fprintf(stderr, "[HACK]: clone_function_name(2-arg): decl='%s', identifier='%s', suffix='%s'\n", 
+    IDENTIFIER_POINTER (DECL_NAME (decl)), IDENTIFIER_POINTER (identifier), suffix);
   /* For consistency this needs to behave the same way as
      ASM_FORMAT_PRIVATE_NAME does, but without the final number
      suffix.  */
@@ -570,6 +579,8 @@ clone_function_name (tree decl, const char *suffix)
 			   separator,
 			   suffix,
 			   (char*)0));
+  /* DEBUG INJECTION */
+  fprintf(stderr, "[HACK]: clone_function_name(2-arg): result='%s'\n", result);
   return get_identifier (result);
 }
 
@@ -1039,6 +1050,9 @@ cgraph_node::create_version_clone_with_body
   /* Generate a new name for the new version. */
   tree fnname = (version_decl ? clone_function_name_numbered (old_decl, suffix)
 		: clone_function_name (old_decl, suffix));
+  /* DEBUG INJECTION - Track DECL_NAME change */
+  fprintf(stderr, "[HACK]: About to change DECL_NAME from '%s' to '%s' (suffix: %s)\n",
+    IDENTIFIER_POINTER (DECL_NAME (new_decl)), IDENTIFIER_POINTER (fnname), suffix);
   DECL_NAME (new_decl) = fnname;
   SET_DECL_ASSEMBLER_NAME (new_decl, fnname);
   SET_DECL_RTL (new_decl, NULL);

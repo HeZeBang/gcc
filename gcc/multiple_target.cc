@@ -301,6 +301,9 @@ create_target_clone (cgraph_node *node, bool definition, char *name,
       new_node
 	= node->create_version_clone_with_body (vNULL, NULL, NULL, NULL, NULL,
 						name, attributes, false);
+      /* DEBUG INJECTION */
+      fprintf(stderr, "[HACK]: new_node->decl assembler name: %s\n",
+              IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (new_node->decl)));
       if (new_node == NULL)
 	return NULL;
       new_node->force_output = true;
@@ -312,7 +315,12 @@ create_target_clone (cgraph_node *node, bool definition, char *name,
       DECL_ATTRIBUTES (new_decl) = attributes;
       /* Generate a new name for the new version.  */
       tree fname = clone_function_name (node->decl, name);
-      symtab->change_decl_assembler_name (new_node->decl, fname);
+      /* DEBUG INJECTION */
+      fprintf(stderr, "[HACK]: new_decl/fname: %s\n",
+              IDENTIFIER_POINTER (fname));
+              symtab->change_decl_assembler_name (new_node->decl, fname);
+      fprintf(stderr, "[HACK]: new_node->decl assembler name: %s\n",
+              IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (new_node->decl)));
     }
   return new_node;
 }
@@ -331,6 +339,9 @@ expand_target_clones (struct cgraph_node *node, bool definition)
       fprintf (stderr, "[HACK] Expanding target_clones for function: %s\n",
                IDENTIFIER_POINTER (DECL_NAME (node->decl)));
       fprintf (stderr, "[HACK] Definition: %s\n", definition ? "yes" : "no");
+      if (DECL_ASSEMBLER_NAME_SET_P (node->decl))
+        fprintf (stderr, "[HACK] Original assembler name: %s\n",
+                 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl)));
     }
   
   /* Parsing target attributes separated by TARGET_CLONES_ATTR_SEPARATOR.  */
@@ -452,6 +463,10 @@ expand_target_clones (struct cgraph_node *node, bool definition)
       /* DEBUG INJECTION: Print created node details */
       if (new_node && DECL_NAME (new_node->decl))
 	{
+    fprintf (stderr, "[HACK] Original: %s\n",
+               IDENTIFIER_POINTER (DECL_NAME (node->decl)));
+    fprintf (stderr, "[HACK] After: %s\n",
+               IDENTIFIER_POINTER (DECL_NAME (new_node->decl)));
 	  fprintf (stderr, "[HACK] Created clone function name: %s\n", 
 		   IDENTIFIER_POINTER (DECL_NAME (new_node->decl)));
 	  if (DECL_ASSEMBLER_NAME_SET_P (new_node->decl))
