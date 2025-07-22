@@ -192,6 +192,12 @@ create_dispatcher_calls (struct cgraph_node *node)
       DECL_ARTIFICIAL (node->decl) = 1;
       node->force_output = true;
     }
+
+  /* Fix for IPA-CP assertion failure: After dispatcher creation, the function 
+     contained with O2/O3 optimizations will raise error in asserting callers > 0.
+     This prevents IPA-CP from treating it as local (which requires at least
+     one caller) and avoids the assertion in initialize_node_lattices. */
+  node->local = false;
 }
 
 /* Create string with attributes separated by TARGET_CLONES_ATTR_SEPARATOR.
@@ -339,9 +345,6 @@ expand_target_clones (struct cgraph_node *node, bool definition)
       fprintf (stderr, "[HACK] Expanding target_clones for function: %s\n",
                IDENTIFIER_POINTER (DECL_NAME (node->decl)));
       fprintf (stderr, "[HACK] Definition: %s\n", definition ? "yes" : "no");
-      if (DECL_ASSEMBLER_NAME_SET_P (node->decl))
-        fprintf (stderr, "[HACK] Original assembler name: %s\n",
-                 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl)));
     }
   
   /* Parsing target attributes separated by TARGET_CLONES_ATTR_SEPARATOR.  */
